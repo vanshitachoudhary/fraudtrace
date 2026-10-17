@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FraudTrace</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
+<style>
+:root{--ink:#0d1219;--panel:#141b26;--panel2:#1a2331;--line:#263143;--text:#d9e0ec;--dim:#8592a8;
+--teal:#4fd1c5;--amber:#f2b84b;--red:#ff5a5f;--violet:#a78bfa;--r:10px}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--ink);color:var(--text);font:14px/1.45 "Instrument Sans",system-ui,sans-serif;display:flex;flex-direction:column}
+header{display:flex;align-items:baseline;gap:14px;padding:12px 20px;border-bottom:1px solid var(--line)}
+header h1{margin:0;font-size:20px;font-weight:700;letter-spacing:-.01em}
+header span{color:var(--dim)}
+main{flex:1;min-height:0;display:grid;grid-template-columns:280px 1fr 380px;gap:0}
+section{min-height:0;overflow:auto;padding:16px}
+.left{border-right:1px solid var(--line)}
+.right{border-left:1px solid var(--line);display:flex;flex-direction:column;gap:14px}
+h2{margin:0 0 8px;font-size:13px;font-weight:600;color:var(--dim)}
+button{font:inherit;color:var(--text);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;cursor:pointer}
+button:hover{border-color:var(--amber)}
+button:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+button.primary{background:var(--amber);color:#1b1405;border-color:var(--amber);font-weight:600}
+button:disabled{opacity:.5;cursor:default}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:18px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:8px}
+.stat b{display:block;font-size:22px}
+.stat small{color:var(--dim)}
+.case{display:block;width:100%;text-align:left;margin-bottom:8px;background:var(--panel)}
+.case small{display:block;color:var(--dim)}
+.case.active{border-color:var(--amber)}
+.centre{position:relative;padding:0}
+#graph{position:absolute;inset:0}
+.legend{position:absolute;left:14px;bottom:12px;display:flex;gap:14px;color:var(--dim);font-size:12px;background:#0d1219cc;padding:6px 10px;border-radius:8px}
+.legend i{display:inline-block;width:10px;height:10px;margin-right:5px;border-radius:50%}
+.empty{position:absolute;inset:0;display:grid;place-items:center;color:var(--dim);text-align:center;pointer-events:none;padding:30px}
+#mem{display:none;margin:0 0 4px;padding:12px 14px;border-radius:var(--r);background:#2a2150;border:1px solid var(--violet);animation:glow 1.6s ease-out 1}
+#mem b{color:var(--violet)}
+@keyframes glow{0%{box-shadow:0 0 0 0 #a78bfa99}100%{box-shadow:0 0 0 22px #a78bfa00}}
+@media (prefers-reduced-motion:reduce){#mem{animation:none}}
+#log{flex:1;min-height:120px;overflow:auto;display:flex;flex-direction:column;gap:8px}
+.step{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:8px 10px}
+.step .t{font-weight:600;color:var(--teal)}
+.step.act .t{color:var(--red)}
+.step.mem .t{color:var(--violet)}
+.thought{color:var(--dim);font-style:italic;padding:0 4px}
+.sys{color:var(--amber);padding:4px}
+details summary{cursor:pointer;color:var(--dim);font-size:12px}
+pre{margin:6px 0 0;white-space:pre-wrap;word-break:break-all;font:11px/1.4 ui-monospace,Menlo,monospace;color:var(--dim);max-height:160px;overflow:auto}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px}
+.verdict.fraud{border-color:var(--red)}
+.verdict h3{margin:0 0 6px;font-size:16px}
+.gauge{height:8px;border-radius:4px;background:var(--panel2);overflow:hidden;margin:6px 0 10px}
+.gauge div{height:100%;width:0;background:var(--amber);transition:width .8s}
+.chips{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin:6px 0}
+.chip{background:var(--panel2);border-radius:6px;padding:2px 6px;font-size:12px}
+ul{margin:6px 0 0;padding-left:18px}
+.cmp{display:flex;gap:10px;align-items:center}
+.cmp div{flex:1;text-align:center}
+.cmp b{display:block;font-size:24px}
+input{flex:1;min-width:0;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit}
+.tabs{position:absolute;left:14px;top:12px;z-index:2;display:flex;gap:6px}
+.tabs button.on{border-color:var(--amber);color:var(--amber)}
+.ans{background:var(--panel);border:1px solid var(--teal);border-radius:var(--r);padding:8px 10px;white-space:pre-wrap}
+.ans small{display:block;color:var(--dim);margin-top:4px}
+#why .list{max-height:240px;overflow:auto;display:flex;flex-direction:column;gap:6px}
+.replay{display:none;position:absolute;right:14px;bottom:12px;gap:8px;align-items:center;background:#0d1219cc;padding:6px 10px;border-radius:8px;z-index:2}
+.replay input{width:180px;flex:none;padding:0}
+.step.cur{border-color:var(--amber)}
+@media (max-width:1000px){main{grid-template-columns:1fr;overflow:auto}.centre{height:60vh}section{overflow:visible}}
+</style>
+</head>
+<body>
+<header><h1>FraudTrace</h1><span>An agent that investigates fraud rings in a graph, remembers what it finds, and shows its proof.</span></header>
+<div style="background:#2a2150;color:#d9e0ec;padding:8px 20px;font-size:13px;border-bottom:1px solid #a78bfa">Replay demo: this page replays real recorded runs of FraudTrace (no database or API key needed). The full app, with FalkorDB and the live agent, runs locally: see the README in the repo.</div>
+<main>
+  <section class="left">
+    <div class="stats">
+      <div class="stat"><b id="sRings">0</b><small>rings known</small></div>
+      <div class="stat"><b id="sFrozen">0</b><small>frozen</small></div>
+      <div class="stat"><b id="sFind">0</b><small>findings</small></div>
+    </div>
+    <div class="row">
+      <button class="primary" id="demo">Run demo</button>
+      <button id="reset">Reset memory</button>
+    </div>
+    <h2>Flagged transactions</h2>
+    <div id="cases"></div>
+    <h2 style="margin-top:18px">Ask the graph</h2>
+    <div class="row" style="margin-bottom:0"><input id="q" placeholder="Who leads the ring we froze?"><button id="ask">Ask</button></div>
+  </section>
+
+  <section class="centre">
+    <div id="graph"></div>
+    <div class="tabs"><button id="tInv" class="on">Investigation</button><button id="tMem">Memory graph</button></div>
+    <div class="empty" id="empty">Pick a flagged transaction and press Investigate.<br>The graph fills in as the agent follows connections.</div>
+    <div class="replay" id="replay"><button id="rp">Play</button><input type="range" id="rs" min="0" max="0" value="0" aria-label="Replay investigation"><span id="rl"></span></div>
+    <div class="legend"><span><i style="background:var(--teal)"></i>account</span><span><i style="background:var(--amber)"></i>device</span><span><i style="background:#8592a8"></i>address</span><span><i style="background:var(--violet)"></i>remembered</span><span><i style="background:var(--red)"></i>frozen</span></div>
+  </section>
+
+  <section class="right">
+    <div id="mem"></div>
+    <div><h2>Agent trace</h2><div id="log"></div></div>
+    <div id="verdict"></div>
+    <div id="why"></div>
+    <div id="cmp"></div>
+  </section>
+</main>
+
+<script>
+/* Replay shim: serves the recorded runs instead of the live backend. */
+const _fetch = window.fetch.bind(window);
+let current = null;
+const asJson = o => Promise.resolve(new Response(JSON.stringify(o), {headers: {"Content-Type": "application/json"}}));
+window.fetch = (url, opts) => {
+  const u = String(url);
+  if (u.startsWith("/api/cases")) return _fetch("recordings/cases.json");
+  if (u.startsWith("/api/stats")) return asJson(current ? current.stats : {rings: 0, frozen: 0, findings: 0});
+  if (u.startsWith("/api/memory")) return asJson(current ? current.memory : {nodes: [], edges: []});
+  if (u.startsWith("/api/decisions")) return asJson(current ? current.decisions : []);
+  if (u.startsWith("/api/reset")) { current = null; return asJson({ok: true}); }
+  if (u.startsWith("/api/ask")) return asJson({answer: "Ask the graph needs the live backend (FalkorDB + an LLM). This page only replays recorded runs. Run the project locally to try it.", tools: []});
+  return _fetch(url, opts);
+};
+class EventSource {
+  constructor(url) {
+    const txn = new URL(url, location.href).searchParams.get("txn");
+    this.closed = false;
+    _fetch("recordings/" + txn + ".json").then(r => { if (!r.ok) throw new Error("missing"); return r.json(); }).then(async rec => {
+      for (const ev of rec.events) {
+        await new Promise(r => setTimeout(r, ev.type === "thought" ? 900 : 650));
+        if (this.closed) return;
+        if (ev.type === "final") current = rec;
+        this.onmessage && this.onmessage({data: JSON.stringify(ev)});
+      }
+    }).catch(() => this.onmessage && this.onmessage({data: JSON.stringify({type: "error", text: "This case was not recorded for the replay demo."})}));
+  }
+  close() { this.closed = true; }
+}
+</script>
+<script>
+const $ = s => document.querySelector(s);
+const COL = {account:"#4fd1c5", device:"#f2b84b", address:"#8592a8", memory:"#a78bfa", frozen:"#ff5a5f"};
+const nodes = new vis.DataSet(), edges = new vis.DataSet();
+const net = new vis.Network($("#graph"), {nodes, edges}, {
+  physics:{solver:"forceAtlas2Based", forceAtlas2Based:{gravitationalConstant:-60,springLength:90}, stabilization:false},
+  nodes:{font:{color:"#d9e0ec",size:11,face:"Instrument Sans"},borderWidth:2},
+  edges:{color:{color:"#3a4a63"},font:{color:"#8592a8",size:9,strokeWidth:0},smooth:false,arrows:{to:{enabled:false}}},
+  interaction:{hover:true}
+});
+let cases = [], sessions = [], lastFinal = null, busy = false, selected = null;
+
+function nodeStyle(id, k){
+  const c = COL[k] || COL.account, shape = k==="device" ? "diamond" : k==="address" ? "triangle" : "dot";
+  return {id, label:id, shape, size:k==="account"||k==="memory"||k==="frozen"?14:11,
+          color:{background:c, border:k==="memory"?COL.memory:c}, opacity:1};
+}
+function addGraph(g){
+  $("#empty").style.display = "none";
+  for (const [id,k] of g.nodes||[]){
+    const ex = nodes.get(id);
+    if (!ex) nodes.add(nodeStyle(id,k));
+    else if (k==="frozen") nodes.update({id, color:{background:COL.frozen,border:COL.frozen}, label:"🔒 "+id});
+    else if (k==="memory") nodes.update({id, color:{background:ex.color.background, border:COL.memory}, borderWidth:4});
+  }
+  for (const [a,b,l] of g.edges||[]){
+    const id = a+"|"+b+"|"+l;
+    if (!edges.get(id) && nodes.get(a) && nodes.get(b)) edges.add({id, from:a, to:b, label:l});
+  }
+}
+function showProof(r){
+  const ring = new Set(r.ring_members||[]), path = r.path||[];
+  nodes.get().forEach(n => {
+    const inRing = ring.has(n.id) || path.includes(n.id);
+    nodes.update({id:n.id, opacity: inRing ? 1 : .25});
+  });
+  if (r.verdict !== "fraud_ring") return;
+  for (const m of ring) if (nodes.get(m)) nodes.update({id:m, color:{background:COL.frozen,border:COL.frozen}});
+  if (r.leader && nodes.get(r.leader)) nodes.update({id:r.leader, label:"👑 "+r.leader, size:24});
+  for (let i=0;i<path.length-1;i++){
+    const hit = edges.get().find(e => (e.from===path[i]&&e.to===path[i+1])||(e.to===path[i]&&e.from===path[i+1]));
+    if (hit) edges.update({id:hit.id, color:{color:COL.frozen}, width:4});
+    else if (nodes.get(path[i]) && nodes.get(path[i+1])) edges.add({from:path[i], to:path[i+1], color:{color:COL.frozen}, width:4});
+  }
+  net.fit({animation:true});
+}
+function clearGraph(){ nodes.clear(); edges.clear(); $("#empty").innerHTML = EMPTY_HTML; $("#empty").style.display = ""; }
+
+function summarize(s){
+  const r = s.result;
+  if (r.error) return "Tool error: " + String(r.error).slice(0, 140);
+  switch(s.tool){
+    case "recall_memory": return r.memory_hit ? `Memory hit: ${r.ring}, ${r.members.length} known members, leader ${r.leader}` : "Nothing in memory about this account";
+    case "get_neighbors": return `${r.linked_accounts.length} accounts share a device or address with ${r.account}`;
+    case "money_flow": return `Sent ${r.total_sent}, received ${r.total_received} (${r.account})`;
+    case "shortest_path": return r.path ? r.path.join(" → ") : "No connection found";
+    case "find_ring": return `[${r.engine}] Cluster of ${r.cluster_size} accounts, ${r.transfers_just_under_10000} transfers just under 10,000, likely leader ${r.likely_leader||"none"}`;
+    case "flag_accounts": return `Froze ${r.frozen.length} account(s)`;
+    case "save_finding": return `Saved finding ${r.finding_id} to memory (${r.saved_members} members)`;
+  }
+  return "";
+}
+const el = (h) => { const d = document.createElement("div"); d.innerHTML = h; return d.firstElementChild; };
+const esc = s => String(s).replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
+function logAdd(node){ const l = $("#log"); l.appendChild(node); l.scrollTop = l.scrollHeight; }
+
+function renderVerdict(f){
+  const r = f.result, fraud = r.verdict === "fraud_ring";
+  const color = r.risk >= 70 ? COL.frozen : r.risk >= 40 ? COL.amber : COL.teal;
+  $("#verdict").innerHTML = `<div class="card verdict ${fraud?"fraud":""}">
+    <h3>${fraud ? "Fraud ring: accounts frozen" : r.verdict === "legit" ? "Looks legitimate: no action" : "Inconclusive"}</h3>
+    <div>Risk ${r.risk}/100</div><div class="gauge"><div style="width:${r.risk}%;background:${color}"></div></div>
+    ${r.leader ? `<div>Ring leader: <span class="chip">👑 ${esc(r.leader)}</span> · ${(r.ring_members||[]).length} members</div>` : ""}
+    ${(r.path||[]).length ? `<div class="chips">${r.path.map(p=>`<span class="chip">${esc(p)}</span>`).join("→")}${r.path_verified?'<span class="chip" style="color:var(--teal)">verified by graph query</span>':""}</div>` : ""}
+    <ul>${(r.reasons||[]).map(x=>`<li>${esc(x)}</li>`).join("")}</ul>
+    <div class="row" style="margin:10px 0 0"><button id="whyBtn">Why this decision?</button><button id="dl">Case file (.md)</button><button id="pdf">Case file (PDF)</button></div></div>`;
+  $("#dl").onclick = () => download(f); $("#pdf").onclick = () => printPdf(f); $("#whyBtn").onclick = showWhy;
+}
+function download(f){
+  const r = f.result;
+  const md = `# Case file: ${f.txn}\n\n- Transaction: ${f.from} → ${f.to}, amount ${f.amount}\n- Verdict: ${r.verdict} (risk ${r.risk}/100)\n- Used memory: ${r.used_memory}\n- Steps: ${f.steps}\n- Leader: ${r.leader}\n- Ring members: ${(r.ring_members||[]).join(", ")}\n- Proof path: ${(r.path||[]).join(" → ")}\n\n## Reasons\n${(r.reasons||[]).map(x=>"- "+x).join("\n")}\n`;
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([md], {type:"text/markdown"})); a.download = f.txn + "-case-file.md"; a.click();
+}
+function renderCmp(){
+  const a = sessions.find(s => !s.mem), b = [...sessions].reverse().find(s => s.mem);
+  if (!a || !b || a === b) { $("#cmp").innerHTML = ""; return; }
+  const pct = a.steps ? Math.round((1 - b.steps/a.steps)*100) : 0;
+  $("#cmp").innerHTML = `<div class="card"><h2>Memory effect</h2><div class="cmp">
+    <div><b>${a.steps}</b>steps, without memory</div><div><b style="color:var(--violet)">${b.steps}</b>steps, with memory</div></div>
+    <div style="text-align:center;margin-top:6px;color:var(--dim)">${pct > 0 ? pct + "% fewer steps with memory" : "No saving this time"}</div></div>`;
+}
+async function refresh(){
+  const s = await (await fetch("/api/stats")).json();
+  $("#sRings").textContent = s.rings; $("#sFrozen").textContent = s.frozen; $("#sFind").textContent = s.findings;
+}
+function renderCases(){
+  $("#cases").innerHTML = "";
+  cases.forEach(c => {
+    const b = el(`<button class="case ${selected===c.id?"active":""}">${c.id}<small>${c.from} → ${c.to} · ${c.amount}</small></button>`);
+    b.onclick = () => { if (busy) return; selected = c.id; renderCases(); run(c.id); };
+    $("#cases").appendChild(b);
+  });
+}
+
+function run(txn){
+  return new Promise(resolve => {
+    if (busy) return resolve();
+    busy = true; mode = "inv"; setTabs(); saved = null; steps = []; syncReplay(); clearGraph(); $("#why").innerHTML = ""; $("#mem").style.display = "none"; $("#verdict").innerHTML = "";
+    document.querySelectorAll("button").forEach(b => b.disabled = true);
+    const es = new EventSource("/api/investigate?txn=" + encodeURIComponent(txn));
+    const done = () => { es.close(); busy = false; syncReplay(); document.querySelectorAll("button").forEach(b => b.disabled = false); refresh(); resolve(); };
+    es.onmessage = m => {
+      const ev = JSON.parse(m.data);
+      if (ev.type === "start") logAdd(el(`<div class="sys">Investigating ${ev.txn}: ${ev.from} sent ${ev.amount} to ${ev.to}</div>`));
+      if (ev.type === "thought") logAdd(el(`<div class="thought">${esc(ev.text)}</div>`));
+      if (ev.type === "step"){
+        steps.push(ev);
+        addGraph(ev.graph);
+        const cls = ev.tool==="flag_accounts" ? "act" : ev.tool==="recall_memory" && ev.memory_hit ? "mem" : "";
+        logAdd(el(`<div class="step ${cls}" data-n="${ev.n}"><div><span class="t">${ev.n}. ${ev.tool}</span></div><div>${esc(summarize(ev))}</div>
+          <details><summary>Raw result</summary><pre>${esc(JSON.stringify({args:ev.args,result:ev.result},null,1))}</pre></details></div>`));
+        if (ev.memory_hit){
+          const m = $("#mem"); m.style.display = "block"; m.style.animation = "none"; void m.offsetWidth; m.style.animation = "";
+          m.innerHTML = `<b>Memory hit.</b> This account belongs to ${esc(ev.result.ring)}, which the agent investigated before. It skips the full investigation.`;
+        }
+      }
+      if (ev.type === "final"){
+        lastFinal = ev; showProof(ev.result); renderVerdict(ev);
+        sessions.push({txn:ev.txn, steps:ev.steps, mem:!!(ev.result && ev.result.used_memory)}); renderCmp(); done();
+      }
+      if (ev.type === "error"){ logAdd(el(`<div class="sys" style="color:var(--red)">${esc(ev.text)}</div>`)); done(); }
+    };
+    es.onerror = () => { logAdd(el(`<div class="sys" style="color:var(--red)">Lost connection to the server. Is uvicorn running?</div>`)); done(); };
+  });
+}
+
+$("#reset").onclick = async () => {
+  await fetch("/api/reset", {method:"POST"}); sessions = []; $("#cmp").innerHTML = ""; $("#verdict").innerHTML = "";
+  $("#mem").style.display = "none"; $("#log").innerHTML = ""; $("#why").innerHTML = ""; steps = []; syncReplay(); clearGraph(); refresh();
+  logAdd(el(`<div class="sys">Memory wiped and accounts unfrozen.</div>`));
+};
+$("#demo").onclick = async () => {
+  if (busy || cases.length < 2) return;
+  await fetch("/api/reset", {method:"POST"}); sessions = []; $("#log").innerHTML = "";
+  selected = cases[0].id; renderCases(); logAdd(el(`<div class="sys">Session 1: fresh agent, empty memory</div>`));
+  await run(cases[0].id);
+  await new Promise(r => setTimeout(r, 2500));
+  selected = cases[1].id; renderCases();
+  logAdd(el(`<div class="sys">Agent restarted: new session, no chat history. Only the graph remembers.</div>`));
+  await run(cases[1].id);
+};
+const EMPTY_HTML = $("#empty").innerHTML;
+let mode = "inv", saved = null, steps = [], timer = null;
+function syncReplay(){
+  const on = mode === "inv" && steps.length && !busy;
+  $("#replay").style.display = on ? "flex" : "none";
+  if (on){ $("#rs").max = steps.length; $("#rs").value = steps.length; $("#rl").textContent = `${steps.length}/${steps.length}`; }
+}
+function renderUpTo(k){
+  nodes.clear(); edges.clear(); $("#empty").style.display = "none";
+  for (let i = 0; i < k; i++) addGraph(steps[i].graph);
+  if (k === steps.length && lastFinal) showProof(lastFinal.result);
+  document.querySelectorAll("#log .step").forEach(s => s.classList.toggle("cur", +s.dataset.n === k));
+  $("#rl").textContent = `${k}/${steps.length}`; $("#rs").value = k;
+}
+$("#rs").oninput = e => { clearInterval(timer); $("#rp").textContent = "Play"; renderUpTo(+e.target.value); };
+$("#rp").onclick = () => {
+  if (timer){ clearInterval(timer); timer = null; $("#rp").textContent = "Play"; return; }
+  let k = +$("#rs").value >= steps.length ? 0 : +$("#rs").value;
+  $("#rp").textContent = "Pause";
+  timer = setInterval(() => { k++; renderUpTo(k); if (k >= steps.length){ clearInterval(timer); timer = null; $("#rp").textContent = "Play"; } }, 900);
+};
+function printPdf(f){
+  const r = f.result, w = window.open("", "_blank");
+  w.document.write(`<title>${esc(f.txn)} case file</title><body style="font:15px/1.5 system-ui;max-width:720px;margin:40px auto"><h1>Case file: ${esc(f.txn)}</h1>
+  <p>Transaction: ${esc(f.from)} → ${esc(f.to)}, amount ${esc(f.amount)}</p><p><b>Verdict:</b> ${esc(r.verdict)} (risk ${r.risk}/100)${r.path_verified ? ", proof path verified by graph query" : ""}</p>
+  <p><b>Used memory:</b> ${r.used_memory} · <b>Steps:</b> ${f.steps}</p><p><b>Leader:</b> ${esc(r.leader)}</p><p><b>Ring members:</b> ${esc((r.ring_members||[]).join(", "))}</p>
+  <p><b>Proof path:</b> ${esc((r.path||[]).join(" → "))}</p><h3>Reasons</h3><ul>${(r.reasons||[]).map(x=>`<li>${esc(x)}</li>`).join("")}</ul></body>`);
+  w.document.close(); w.focus(); w.print();
+}
+function setTabs(){ $("#tInv").classList.toggle("on", mode === "inv"); $("#tMem").classList.toggle("on", mode === "mem"); }
+async function showMem(){
+  if (busy || mode === "mem") return;
+  saved = {n: nodes.get(), e: edges.get()}; mode = "mem"; setTabs(); syncReplay();
+  const m = await (await fetch("/api/memory")).json();
+  nodes.clear(); edges.clear();
+  const sty = {Ring:{shape:"dot",size:28,c:COL.memory}, Finding:{shape:"box",size:12,c:COL.amber}, Decision:{shape:"square",size:12,c:COL.frozen}, Account:{shape:"dot",size:10,c:COL.account}};
+  m.nodes.forEach(([id,l]) => { const s = sty[l] || sty.Account; nodes.add({id, label:id, shape:s.shape, size:s.size, color:{background:s.c,border:s.c}, opacity:1}); });
+  m.edges.forEach(([a,b,t]) => edges.add({from:a, to:b, label:t}));
+  $("#empty").innerHTML = "Memory is empty.<br>Run an investigation first, then come back here.";
+  $("#empty").style.display = m.nodes.length ? "none" : "";
+  net.fit();
+}
+function showInv(){
+  if (busy || mode === "inv") return;
+  mode = "inv"; setTabs(); syncReplay(); nodes.clear(); edges.clear();
+  if (saved && saved.n.length){ nodes.add(saved.n); edges.add(saved.e); $("#empty").style.display = "none"; }
+  else { $("#empty").innerHTML = EMPTY_HTML; $("#empty").style.display = ""; }
+}
+$("#tMem").onclick = showMem; $("#tInv").onclick = showInv;
+
+async function showWhy(){
+  const d = await (await fetch("/api/decisions")).json();
+  $("#why").innerHTML = `<div class="card"><h2>Decision trace</h2><div class="list">${d.length ? d.map(x =>
+    `<div class="step"><b>${esc(x.account)}</b> frozen<br>${esc(x.reason || "")}<br><small style="color:var(--dim)">${x.finding ?
+    `Based on ${esc(x.finding)} (${esc(x.ring)}): ${esc(x.summary)}. Evidence: ${esc(x.evidence)}` : "No finding linked"}</small></div>`).join("") : "No decisions yet."}</div></div>`;
+}
+$("#ask").onclick = async () => {
+  const qn = $("#q").value.trim().replace(/^["“]|["”]$/g, ""); if (!qn || busy) return;
+  busy = true; $("#ask").disabled = true;
+  logAdd(el(`<div class="sys">Question: ${esc(qn)}</div>`));
+  try {
+    const r = await (await fetch("/api/ask?question=" + encodeURIComponent(qn))).json();
+    logAdd(el(`<div class="ans">${esc(String(r.answer).replace(/\*+/g, ""))}<small>Tools used: ${r.tools.length ? r.tools.join(", ") : "none"}</small></div>`));
+  } catch (e) {
+    logAdd(el(`<div class="sys" style="color:var(--red)">Ask failed: ${esc(e.message)}</div>`));
+  } finally {
+    busy = false; $("#ask").disabled = false;
+  }
+};
+$("#q").onkeydown = e => { if (e.key === "Enter") $("#ask").click(); };
+
+(async () => { cases = await (await fetch("/api/cases")).json(); renderCases(); refresh(); })();
+</script>
+</body>
+</html>
