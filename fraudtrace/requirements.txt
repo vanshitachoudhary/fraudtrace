@@ -1,0 +1,6 @@
+falkordb
+mcp<2
+openai
+fastapi
+uvicorn
+ 
