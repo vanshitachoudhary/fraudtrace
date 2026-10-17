@@ -9,6 +9,16 @@ from agent import investigate, ask
 app = FastAPI()
 HERE = os.path.dirname(os.path.abspath(__file__))
 _tasks = set()
+RECORD = os.getenv("RECORD") == "1"   # RECORD=1: save every finished run for the static replay demo
+
+
+def save_recording(txn, events):
+    d = os.path.join(HERE, "docs", "recordings")
+    os.makedirs(d, exist_ok=True)
+    with open(os.path.join(d, f"{txn}.json"), "w", encoding="utf-8") as f:
+        json.dump({"events": events, "stats": stats(), "memory": memory_graph(), "decisions": decisions()}, f)
+    with open(os.path.join(d, "cases.json"), "w", encoding="utf-8") as f:
+        json.dump(cases(), f)
 
 
 @app.get("/")
@@ -51,10 +61,14 @@ async def run(txn: str):
     t.add_done_callback(_tasks.discard)
 
     async def gen():
+        events = []
         while True:
             ev = await queue.get()
+            events.append(ev)
             yield f"data: {json.dumps(ev)}\n\n"
             if ev["type"] in ("final", "error"):
+                if RECORD and ev["type"] == "final":
+                    save_recording(txn, events)
                 break
     return StreamingResponse(gen(), media_type="text/event-stream")
 
