@@ -12,8 +12,8 @@
 **Try it in 30 seconds:** open the replay demo above and click **Run demo**. It replays real recorded runs of the agent
 (it is a recording, not a live backend: see "Replay demo" below). To run the real thing, see "Setup (local)".
 
-FraudTrace is an AI agent that investigates flagged transactions by following connections in a FalkorDB graph,
-freezes fraud rings, **remembers what it learned in a second graph**, and shows the proof behind every decision.
+FraudTrace is an AI agent that investigates flagged transactions by following connections in a FalkorDB graph, freezes fraud rings,
+**remembers what it learned in a second graph**, and shows the proof behind every decision.
 
 > Fraud rarely shows up in a single record. Five accounts share one device and the money flows to one leader:
 > that is a *relationship* problem, so the agent's context lives in a graph.
@@ -37,7 +37,7 @@ Typical result in our runs: first investigation 5 to 7 steps, same ring seen aga
 ## How this meets the Graph Hacks requirements
 | Requirement | Where |
 |---|---|
-| FalkorDB is the primary database and does real work | Data and agent memory live in two FalkorDB graphs; ring detection uses `algo.WCC`, the leader uses `algo.pageRank` (see "Why the graph is essential") |
+| FalkorDB is the primary database and does real work | Data and agent memory live in two FalkorDB graphs; ring detection uses `algo.WCC`, the leader uses `algo.pageRank` |
 | Public source-code repository | https://github.com/vanshitachoudhary/fraudtrace |
 | README with setup instructions and graph data model | "Setup (local)" and "Graph data model" below |
 | Cypher queries or graph algorithms the product depends on | "Cypher queries and graph algorithms" below |
@@ -67,10 +67,6 @@ Browser UI (SSE)  ->  FastAPI (app.py)  ->  Agent (agent.py, LLM with tool calli
                                                 |
                                   FalkorDB:  fraud_data  +  fraud_memory
 ```
-- `seed_data.py`: synthetic data, 300 normal accounts + 3 hidden fraud rings (structuring just under 10,000) + 2 false-positive cases.
-- `mcp_server.py`: all graph tools (MCP).
-- `agent.py`: tool-calling loop, proof-path verification, free-tier model rotation.
-- `app.py` + `static/index.html`: API and the "war room" UI (live graph, trace, memory graph tab, decision trace, replay, case file export).
 
 ## Graph data model
 
@@ -97,7 +93,7 @@ Browser UI (SSE)  ->  FastAPI (app.py)  ->  Agent (agent.py, LLM with tool calli
 
 Edges: `(Account)-[:MEMBER_OF]->(Ring)`, `(Finding)-[:ABOUT]->(Ring)`, `(Decision)-[:ON]->(Account)`, `(Decision)-[:BASED_ON]->(Finding)`.
 
-## Cypher queries and graph algorithms the product depends on
+## Cypher queries and graph algorithms
 ```cypher
 // Community detection (native FalkorDB algorithm): which accounts form one cluster?
 CALL algo.WCC({nodeLabels:['Account','Device','Address'], relationshipTypes:['USED_DEVICE','LIVES_AT']})
